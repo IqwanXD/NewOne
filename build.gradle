@@ -1,0 +1,23 @@
+// Proyek Music: tanpa AndroidX dan tanpa AppCompat.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        // NewPipeExtractor dipublikasikan lewat JitPack
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
+}

@@ -1,0 +1,80 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Penandatanganan rilis dari environment (diisi workflow dari GitHub Secrets).
+// Bila tidak ada, rilis ditandatangani dengan kunci debug supaya tetap bisa dipasang.
+def ksFile = System.getenv('KEYSTORE_FILE')
+
+android {
+    namespace 'ru.iqwanoino.music'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'ru.iqwanoino.music'
+        minSdk 21
+        targetSdk 34
+        versionCode 60
+        versionName '0.60'
+        // Satu APK universal: tanpa splits dan tanpa abiFilters (tidak ada kode native)
+    }
+
+    signingConfigs {
+        if (ksFile) {
+            release {
+                storeFile file(ksFile)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+            // Wajib R8 (mode tanpa shrink): jar NewPipeExtractor v0.27+ memakai Java record
+            minifyEnabled true
+            shrinkResources false
+            proguardFiles 'proguard-rules.pro', 'r8-dex-only.pro'
+        }
+        release {
+            minifyEnabled true        // R8 tanpa shrink/obfuscate, lihat r8-dex-only.pro
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'r8-dex-only.pro'
+            signingConfig ksFile ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    // Desugaring: API Java 8 (java.util.function, Map.getOrDefault, dll) untuk minSdk 21
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    packaging {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/INDEX.LIST',
+                         'META-INF/*.kotlin_module', 'META-INF/versions/**']
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    // Hanya desugaring. Tanpa AndroidX, tanpa AppCompat, tanpa library scraper.
+    // NewPipeExtractor: scraper YouTube dari proyek NewPipe (Java murni, tanpa AndroidX)
+    // v0.27.1 (10 Nov 2026): n-sig parsing baru, versi klien YouTube diambil dari service worker,
+    // dan klien Android/iOS yang sudah mati dibuang (stream hanya lewat klien visionOS).
+    // v0.26.5 ke bawah gagal mengurai pemutar YouTube terbaru -> "YouTube tidak bisa diputar".
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.27.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+}
