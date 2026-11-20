@@ -447,6 +447,7 @@ public class MainActivity extends Activity {
 
         // Pemutar di atas segalanya
         panel = new PlayerPanel(this);
+        panel.setNav(nav);
         root.addView(panel, new FrameLayout.LayoutParams(-1, -1));
 
         drawer = new LinearLayout(this);

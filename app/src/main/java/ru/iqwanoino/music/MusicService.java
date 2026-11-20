@@ -75,6 +75,7 @@ public class MusicService extends Service {
     private boolean prepared, loading, wantPlay, resumeAfterTransient, foreground, buffering;
     private int loadToken;
     private int cachedNext = -1;
+    private String prefetchingId;
     private final Handler main = new Handler(Looper.getMainLooper());
 
     private final AudioManager.OnAudioFocusChangeListener focusListener = change -> {
@@ -329,6 +330,7 @@ public class MusicService extends Service {
         loading = true;
         prepared = false;
         buffering = false;
+        prefetchNext();
 
         if (!s.isOnline()) {
             prepare(s.uri(), false, token);
@@ -376,6 +378,24 @@ public class MusicService extends Service {
                 }
             });
         }, "resolve").start();
+    }
+
+    /** Resolve URL lagu berikutnya di latar belakang, supaya pindah lagu tidak menunggu jaringan. */
+    private void prefetchNext() {
+        int n = peekNextIndex();
+        if (n < 0 || n >= queue.size()) return;
+        final Library.Song next = queue.get(n);
+        if (!next.isOnline() || Cache.hasAudio(next)) return;
+        final String memo = String.valueOf(next.id);
+        if (memo.equals(prefetchingId) || Cache.urlGet(memo) != null) return;
+        prefetchingId = memo;
+        new Thread(() -> {
+            try {
+                if (Net.online(this)) Cache.urlPut(memo, Online.resolve(next));
+            } catch (Exception ignored) {
+                // gagal prefetch: saat lagu itu diputar, resolve diulang seperti biasa
+            }
+        }, "prefetch").start();
     }
 
     private void fail(String msg) {

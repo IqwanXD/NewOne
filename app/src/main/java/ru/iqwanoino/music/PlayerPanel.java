@@ -59,6 +59,7 @@ final class PlayerPanel extends FrameLayout {
     private final FrameLayout.LayoutParams artLp, titleLp, seekLp, timesLp, controlsLp, handleLp;
     private final LinearLayout controls, titles, times;
     private final FrameLayout handleArea;
+    private View navView;                  // bottom nav: turun dan hilang saat pemutar penuh
 
     private float progress;                // 0 mini, 1 penuh
     private int bottomInset;               // jarak mini dari tepi bawah (bottom nav + margin)
@@ -299,7 +300,7 @@ final class PlayerPanel extends FrameLayout {
         artLp.topMargin = t + Ui.dp(40);
         titleLp.topMargin = artLp.topMargin + artLp.height + Ui.dp(22);
         seekLp.topMargin = titleLp.topMargin + Ui.dp(72);
-        timesLp.topMargin = seekLp.topMargin + Ui.dp(40);
+        timesLp.topMargin = seekLp.topMargin + Ui.dp(44) + Ui.dp(10);      // di bawah WaveSlider, tidak menabrak
         controlsLp.bottomMargin = Ui.insetBottom + Ui.dp(32);
         handleArea.setLayoutParams(handleLp);
         art.setLayoutParams(artLp);
@@ -307,6 +308,12 @@ final class PlayerPanel extends FrameLayout {
         seek.setLayoutParams(seekLp);
         times.setLayoutParams(timesLp);
         controls.setLayoutParams(controlsLp);
+        applyProgress();
+    }
+
+    /** Bottom nav yang ikut turun saat pemutar dibuka penuh. */
+    void setNav(View nav) {
+        navView = nav;
         applyProgress();
     }
 
@@ -369,6 +376,13 @@ final class PlayerPanel extends FrameLayout {
         fullView.setAlpha(fullA);
         fullView.setVisibility(fullA < 0.01f ? INVISIBLE : VISIBLE);
         seek.setWaveFactor(p);                                  // gelombang penuh saat terbuka, lurus saat diciutkan
+
+        if (navView != null) {
+            int navBottom = ((FrameLayout.LayoutParams) navView.getLayoutParams()).bottomMargin;
+            float drop = navView.getHeight() + navBottom + Ui.dp(16);   // cukup untuk keluar layar
+            navView.setTranslationY(drop * p);
+            navView.setVisibility(p > 0.98f ? INVISIBLE : VISIBLE);
+        }
 
         scrim.setAlpha(0.5f * p);
         scrim.setVisibility(p < 0.01f ? INVISIBLE : VISIBLE);
