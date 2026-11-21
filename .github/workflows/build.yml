@@ -1,0 +1,124 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write        # dibutuhkan hanya untuk membuat GitHub Release saat push tag v*
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Runner ubuntu-latest sudah punya Android SDK. Tidak memakai setup-android:
+      # action itu gagal di runner sekarang (sdkmanager 'tools' tidak ditemukan).
+      - name: Pastikan platform Android 34 tersedia
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "SDK: $SDK"
+          if [ ! -d "$SDK/platforms/android-34" ] || [ ! -d "$SDK/build-tools/34.0.0" ]; then
+            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+            "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
+          fi
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+
+      - name: Gradle 8.13 (proyek tidak memakai wrapper)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Siapkan keystore rilis (opsional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            {
+              echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks"
+              echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+              echo "KEY_ALIAS=$KEY_ALIAS"
+              echo "KEY_PASSWORD=$KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "Rilis ditandatangani dengan keystore dari Secrets."
+          else
+            echo "::notice::Secrets keystore tidak ada. Rilis ditandatangani dengan kunci debug (tetap bisa dipasang)."
+          fi
+
+      - name: Build debug dan rilis
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleRelease
+
+      - name: Cek tidak ada AndroidX / AppCompat
+        continue-on-error: true
+        run: |
+          gradle --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath > deps.txt
+          if grep -qiE "androidx|appcompat|com.android.support" deps.txt; then
+            echo "::warning::AndroidX/AppCompat terdeteksi di dependency:"
+            grep -iE "androidx|appcompat|com.android.support" deps.txt
+          else
+            echo "Bersih: tidak ada AndroidX/AppCompat."
+          fi
+
+      - name: Kumpulkan zip debug dan release
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/Music-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk dist/Music-release.apk
+          cd dist
+          zip -9 -j Music-debug.zip Music-debug.apk
+          zip -9 -j Music-release.zip Music-release.apk
+          rm Music-debug.apk Music-release.apk
+          ls -lh
+
+      - name: Unggah zip debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: Music-debug
+          path: dist/Music-debug.zip
+          if-no-files-found: error
+
+      - name: Unggah zip release
+        uses: actions/upload-artifact@v4
+        with:
+          name: Music-release
+          path: dist/Music-release.zip
+          if-no-files-found: error
+
+      - name: Unggah laporan bila gagal
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            app/build/reports/**
+            deps.txt
+          if-no-files-found: ignore
+
+      - name: GitHub Release (hanya saat push tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Music-debug.zip
+            dist/Music-release.zip
