@@ -41,20 +41,16 @@ final class SrcYouTube implements Online.Source {
     @Override
     public List<Library.Song> search(String q, int page) throws Exception {
         if (page > 0) return YtInnerTube.search(q, page);      // halaman berikutnya: continuation InnerTube
-        ExecutorCompletionService<List<Library.Song>> cs = new ExecutorCompletionService<>(POOL);
-        cs.submit(() -> NewPipeBackend.search(q));
-        cs.submit(() -> YtInnerTube.search(q, 0));
-        long deadline = System.currentTimeMillis() + SEARCH_MS;
-        for (int i = 0; i < 2; i++) {
-            long left = deadline - System.currentTimeMillis();
-            if (left <= 0) break;
-            Future<List<Library.Song>> f = cs.poll(left, TimeUnit.MILLISECONDS);
-            if (f == null) break;
-            try {
-                List<Library.Song> r = f.get();
-                if (r != null && !r.isEmpty()) return r;
-            } catch (Exception ignored) { }
-        }
+        // InnerTube dulu: satu request HTTP biasa, tanpa library. NewPipe hanya cadangan bila InnerTube
+        // gagal atau kosong, supaya pencarian tidak selalu menunggu ekstraktor yang berat.
+        try {
+            List<Library.Song> r = YtInnerTube.search(q, 0);
+            if (r != null && !r.isEmpty()) return r;
+        } catch (Exception ignored) { }
+        try {
+            List<Library.Song> r = NewPipeBackend.search(q);
+            if (r != null && !r.isEmpty()) return r;
+        } catch (Exception ignored) { }
         return pipedSearch(q);
     }
 

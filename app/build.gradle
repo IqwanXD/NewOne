@@ -14,8 +14,8 @@ android {
         applicationId 'ru.iqwanoino.music'
         minSdk 21
         targetSdk 34
-        versionCode 60
-        versionName '0.60'
+        versionCode 61
+        versionName '0.61'
         // Satu APK universal: tanpa splits dan tanpa abiFilters (tidak ada kode native)
     }
 

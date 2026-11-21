@@ -194,20 +194,23 @@ final class PlayerPanel extends FrameLayout {
         art = new ImageView(a);
         art.setScaleType(ImageView.ScaleType.CENTER_CROP);
         Ui.round(art, 24);
-        artLp = flp(fullArt, fullArt, Gravity.TOP | Gravity.LEFT, Ui.dp(32), 0, 0, 0);
+        artLp = flp(fullArt, fullArt, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 0);
         fullView.addView(art, artLp);
 
         titles = new LinearLayout(a);
         titles.setOrientation(LinearLayout.VERTICAL);
+        titles.setGravity(Gravity.CENTER_HORIZONTAL);
         title = Ui.text(a, "", 22, Theme.ON, true);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setGravity(Gravity.CENTER);
         artist = Ui.text(a, "", 15, Theme.ON_VAR, false);
         artist.setSingleLine(true);
         artist.setEllipsize(TextUtils.TruncateAt.END);
+        artist.setGravity(Gravity.CENTER);
         titles.addView(title, Ui.lp(-1, -2));
         titles.addView(artist, Ui.lp(-1, -2, 0, Ui.dp(4), 0, 0));
-        titleLp = flp(fullArt, -2, Gravity.TOP | Gravity.LEFT, Ui.dp(32), 0, 0, 0);
+        titleLp = flp(fullArt, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 0);
         fullView.addView(titles, titleLp);
 
         seek = new WaveSlider(a);
@@ -603,7 +606,9 @@ final class PlayerPanel extends FrameLayout {
             lastId = s.id;
             miniTitle.setText(s.title);
             title.setText(s.title);
+            miniArt.setBackground(Ui.rect(M3.alpha(Theme.ON_VAR, 0.10f), 12));
             Art.bind(miniArt, s, Ui.tinted(act, R.drawable.ic_note, Theme.ON_VAR), Ui.dp(12));
+            art.setBackground(Ui.rect(M3.alpha(Theme.ON_VAR, 0.10f), 24));
             Art.bind(art, s, Ui.tinted(act, R.drawable.ic_note, Theme.ON_VAR), Ui.dp(24));
         }
         int ld = svc.isLoading() ? 1 : 0;
